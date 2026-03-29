@@ -1,0 +1,20 @@
+=================================================================
+ MENTAL HEALTH RISK MODEL — PRODUCTION REPORT
+ Generated: 29 Mar 2026, 22:49
+=================================================================
+
+[ DATASET SUMMARY ]
+ - Dreaddit             | Rows: 3553   | High Risk: 52.3%
+ - Depression Reddit    | Rows: 7731   | High Risk: 49.6%
+ - Mental Health NLP    | Rows: 3512   | High Risk: 14.6%
+
+[ AGGREGATE PERFORMANCE (Test Set) ]
+ Operating Threshold        : 0.208
+ ROC-AUC                    : 0.9278  [95% CI: 0.9182 - 0.9378]
+ Accuracy                   : 80.61%
+ F1 Score                   : 0.8011
+ Precision                  : 0.7023
+ Recall                     : 0.9323
+ False Negative Rate        : 6.8%
+
+=================================================================
