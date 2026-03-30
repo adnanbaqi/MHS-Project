@@ -1,4 +1,5 @@
 venv/
 notebooks/saved_models/
 saved_models.zip
-Backend/app/models/model.pkl
+Backend/app/models/ml_ensemble.pkl
+Backend/app/models/text_lstm_model.pth
