@@ -9,7 +9,7 @@ import pickle
 import numpy as np
 from fastapi import HTTPException
 
-MODEL_PATH = "app/models/saved_model.pkl"
+MODEL_PATH = "app/models/model.pkl"
 OPERATING_THRESHOLD = 0.208  # The exact threshold optimized during training
 
 _calibrated_model = None

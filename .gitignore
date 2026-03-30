@@ -1,0 +1,4 @@
+venv/
+notebooks/saved_models/
+saved_models.zip
+Backend/app/models/model.pkl

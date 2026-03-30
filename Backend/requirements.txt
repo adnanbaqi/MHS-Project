@@ -8,3 +8,26 @@ numpy==1.26.4
 pandas==2.2.2
 python-multipart==0.0.9
 httpx==0.27.0
+pandas
+transformers
+torch 
+
+# Core
+numpy>=1.24
+pandas>=2.0
+
+# Machine Learning
+scikit-learn>=1.3
+
+# Deep Learning
+torch>=2.0
+tensorflow>=2.13
+
+# Transformers (BERT)
+transformers>=4.35
+
+# Visualization
+matplotlib>=3.7
+
+# Optional but recommended (for compatibility & speed)
+tqdm>=4.66

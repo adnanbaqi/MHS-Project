@@ -10,7 +10,7 @@ import numpy as np
 from xgboost import XGBClassifier
 
 
-MODEL_PATH = "app/models/saved_model.pkl"
+MODEL_PATH = "app/models/model.pkl"
 N_FEATURES = 12
 
 
