@@ -1,33 +1,32 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Brain, FileText, Zap, ArrowRight, ArrowLeft, Loader2, CheckCircle2 } from "lucide-react";
+import { Brain, Paperclip, Send, Loader2, Bot, User, AlertCircle, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import ResultsDisplay from "./ResultsDisplay";
 import type { AssessmentOutput } from "@/lib/api";
 
 const GAD7_QUESTIONS = [
-  "Feeling nervous, anxious, or on edge",
-  "Not being able to stop or control worrying",
-  "Worrying too much about different things",
-  "Trouble relaxing",
-  "Being so restless that it's hard to sit still",
-  "Becoming easily annoyed or irritable",
-  "Feeling afraid as if something awful might happen",
+  "Feeling nervous, anxious, or on edge?",
+  "Not being able to stop or control worrying?",
+  "Worrying too much about different things?",
+  "Trouble relaxing?",
+  "Being so restless that it's hard to sit still?",
+  "Becoming easily annoyed or irritable?",
+  "Feeling afraid as if something awful might happen?",
 ];
 
 const PHQ9_QUESTIONS = [
-  "Little interest or pleasure in doing things",
-  "Feeling down, depressed, or hopeless",
-  "Trouble falling/staying asleep, or sleeping too much",
-  "Feeling tired or having little energy",
-  "Poor appetite or overeating",
-  "Feeling bad about yourself or that you're a failure",
-  "Trouble concentrating on things",
-  "Moving or speaking slowly, or being fidgety/restless",
-  "Thoughts that you would be better off dead or of hurting yourself",
+  "Little interest or pleasure in doing things?",
+  "Feeling down, depressed, or hopeless?",
+  "Trouble falling/staying asleep, or sleeping too much?",
+  "Feeling tired or having little energy?",
+  "Poor appetite or overeating?",
+  "Feeling bad about yourself or that you're a failure?",
+  "Trouble concentrating on things?",
+  "Moving or speaking slowly, or being fidgety/restless?",
+  "Thoughts that you would be better off dead or of hurting yourself?",
 ];
 
-// Clinical definitions for the 0-3 scale
 const RATING_OPTIONS = [
   { value: 0, label: "Not at all" },
   { value: 1, label: "Several days" },
@@ -35,7 +34,14 @@ const RATING_OPTIONS = [
   { value: 3, label: "Nearly every day" },
 ];
 
-type Step = "gad7" | "phq9" | "text" | "results";
+type Phase = "gad7" | "phq9" | "context" | "processing" | "results";
+
+interface Message {
+  id: string;
+  role: "bot" | "user";
+  content: string | React.ReactNode;
+  isQuickReply?: boolean;
+}
 
 interface AssessmentFormProps {
   apiBaseUrl: string;
@@ -43,30 +49,112 @@ interface AssessmentFormProps {
 }
 
 const AssessmentForm = ({ apiBaseUrl, mode }: AssessmentFormProps) => {
-  const [gad7, setGad7] = useState<number[]>(Array(7).fill(0));
-  const [phq9, setPhq9] = useState<number[]>(Array(9).fill(0));
+  const [gad7, setGad7] = useState<number[]>([]);
+  const [phq9, setPhq9] = useState<number[]>([]);
   const [text, setText] = useState("");
+  const [file, setFile] = useState<File | null>(null);
 
-  const [step, setStep] = useState<Step>("gad7");
+  const [phase, setPhase] = useState<Phase>("gad7");
+  const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
   const [results, setResults] = useState<AssessmentOutput | null>(null);
-  const [error, setError] = useState<string | null>(null);
 
-  const steps: Step[] = mode === "full" ? ["gad7", "phq9", "text", "results"] : ["gad7", "phq9", "results"];
-  const currentIdx = steps.indexOf(step);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const updateGad7 = (i: number, v: number) => setGad7((p) => p.map((x, j) => (j === i ? v : x)));
-  const updatePhq9 = (i: number, v: number) => setPhq9((p) => p.map((x, j) => (j === i ? v : x)));
+  // Auto-scroll to bottom
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
 
-  const gadTotal = gad7.reduce((a, b) => a + b, 0);
-  const phqTotal = phq9.reduce((a, b) => a + b, 0);
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, isTyping, phase]);
 
-  const submit = async () => {
+  // Helper to simulate bot typing delay
+  const pushBotMessage = (content: string | React.ReactNode, isQuickReply = false, delay = 800) => {
+    setIsTyping(true);
+    setTimeout(() => {
+      setMessages((prev) => [
+        ...prev,
+        { id: Date.now().toString() + Math.random(), role: "bot", content, isQuickReply },
+      ]);
+      setIsTyping(false);
+    }, delay);
+  };
+
+  const pushUserMessage = (content: string | React.ReactNode) => {
+    setMessages((prev) => [
+      ...prev,
+      { id: Date.now().toString() + Math.random(), role: "user", content },
+    ]);
+  };
+
+  // Initialize chat
+  useEffect(() => {
+    pushBotMessage("Hi there. I'm here to help assess your well-being. Let's start with a few quick questions about how you've been feeling over the last 2 weeks.", false, 400);
+    setTimeout(() => {
+      pushBotMessage(`Over the last 2 weeks, how often have you been bothered by: **${GAD7_QUESTIONS[0]}**`, true, 600);
+    }, 1000);
+  }, []);
+
+  const handleOptionSelect = (value: number, label: string) => {
+    // Disable current quick replies immediately to prevent double clicks
+    setMessages((prev) => prev.map((m, i) => i === prev.length - 1 ? { ...m, isQuickReply: false } : m));
+
+    pushUserMessage(label);
+
+    if (phase === "gad7") {
+      const newGad7 = [...gad7, value];
+      setGad7(newGad7);
+
+      if (newGad7.length < GAD7_QUESTIONS.length) {
+        pushBotMessage(`**${GAD7_QUESTIONS[newGad7.length]}**`, true);
+      } else {
+        setPhase("phq9");
+        pushBotMessage("Thank you. Now let's move on to the next set. Over the last 2 weeks, how often have you been bothered by:");
+        setTimeout(() => {
+          pushBotMessage(`**${PHQ9_QUESTIONS[0]}**`, true);
+        }, 1200);
+      }
+    } else if (phase === "phq9") {
+      const newPhq9 = [...phq9, value];
+      setPhq9(newPhq9);
+
+      if (newPhq9.length < PHQ9_QUESTIONS.length) {
+        pushBotMessage(`**${PHQ9_QUESTIONS[newPhq9.length]}**`, true);
+      } else {
+        if (mode === "full") {
+          setPhase("context");
+          pushBotMessage(
+            "Thanks for answering those. Finally, how have you been feeling recently? Feel free to write a short journal entry or share what's on your mind. You can also upload any relevant health files if needed."
+          );
+        } else {
+          submitAssessment(gad7, newPhq9, "");
+        }
+      }
+    }
+  };
+
+  const handleContextSubmit = () => {
+    if (!text.trim() && !file) return;
+
+    let userMsg = text;
+    if (file) userMsg += `\n[Attached File: ${file.name}]`;
+
+    pushUserMessage(userMsg);
+    submitAssessment(gad7, phq9, text);
+  };
+
+  const submitAssessment = async (finalGad7: number[], finalPhq9: number[], finalText: string) => {
+    setPhase("processing");
     setLoading(true);
-    setError(null);
+    pushBotMessage("Processing your clinical and text data... Please wait.");
+
     try {
       const url = mode === "full" ? `${apiBaseUrl}/api/analyze` : `${apiBaseUrl}/api/quick-screen`;
-      const payload = mode === "full" ? { gad7, phq9, text } : { gad7, phq9 };
+      const payload = mode === "full" ? { gad7: finalGad7, phq9: finalPhq9, text: finalText } : { gad7: finalGad7, phq9: finalPhq9 };
 
       const res = await fetch(url, {
         method: "POST",
@@ -81,269 +169,188 @@ const AssessmentForm = ({ apiBaseUrl, mode }: AssessmentFormProps) => {
 
       const data = await res.json();
       setResults(data);
-      setStep("results");
+      // Wait a moment for UX before snapping to results
+      setTimeout(() => setPhase("results"), 1000);
     } catch (e: unknown) {
-      if (e instanceof Error) {
-        setError(e.message);
-      } else {
-        setError("An unexpected error occurred.");
-      }
+      let errorMsg = "An unexpected error occurred.";
+      if (e instanceof Error) errorMsg = e.message;
+
+      pushBotMessage((
+        <div className="flex items-center text-destructive">
+          <AlertCircle className="w-4 h-4 mr-2" />
+          {errorMsg}
+        </div>
+      ));
+      setPhase("context");
     } finally {
       setLoading(false);
     }
   };
 
-  const canProceed = () => {
-    if (step === "text" && mode === "full") return text.trim().length > 0;
-    return true;
-  };
-
-  const next = () => {
-    const nextIdx = currentIdx + 1;
-    if (steps[nextIdx] === "results") {
-      submit();
-    } else {
-      window.scrollTo({ top: 0, behavior: "smooth" });
-      setStep(steps[nextIdx]);
-    }
-  };
-
-  const prev = () => {
-    if (currentIdx > 0) {
-      window.scrollTo({ top: 0, behavior: "smooth" });
-      setStep(steps[currentIdx - 1]);
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setFile(e.target.files[0]);
     }
   };
 
   const reset = () => {
-    setGad7(Array(7).fill(0));
-    setPhq9(Array(9).fill(0));
+    setGad7([]);
+    setPhq9([]);
     setText("");
-    setStep("gad7");
+    setFile(null);
+    setPhase("gad7");
     setResults(null);
-    setError(null);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    setMessages([]);
+    pushBotMessage("Let's start over. Over the last 2 weeks, how often have you been bothered by:", false, 400);
+    setTimeout(() => {
+      pushBotMessage(`**${GAD7_QUESTIONS[0]}**`, true, 600);
+    }, 1000);
   };
 
-  const stepInfo = {
-    gad7: { icon: Brain, title: "GAD-7 Assessment", desc: "Over the last 2 weeks, how often have you been bothered by..." },
-    phq9: { icon: Brain, title: "PHQ-9 Assessment", desc: "Over the last 2 weeks, how often have you been bothered by..." },
-    text: { icon: FileText, title: "Journal Entry", desc: "Share your thoughts for NLP analysis" },
-    results: { icon: Zap, title: "Assessment Complete", desc: "Processing your clinical and text data..." },
-  };
-
-  const info = stepInfo[step];
-  const Icon = info.icon;
-
-  // Reusable Question Block Component to replace the confusing ScoreInput
-  const QuestionBlock = ({
-    question,
-    index,
-    currentValue,
-    onChange
-  }: {
-    question: string,
-    index: number,
-    currentValue: number,
-    onChange: (val: number) => void
-  }) => (
-    <div className="mb-8 p-6 rounded-xl border bg-card text-card-foreground shadow-sm">
-      <h3 className="text-base font-semibold mb-4 leading-tight">
-        <span className="text-muted-foreground mr-2">{index + 1}.</span>
-        {question}
-      </h3>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        {RATING_OPTIONS.map((opt) => {
-          const isSelected = currentValue === opt.value;
-          return (
-            <button
-              key={opt.value}
-              onClick={() => onChange(opt.value)}
-              className={`relative flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all duration-200 text-sm font-medium ${isSelected
-                  ? "border-primary bg-primary/5 text-primary"
-                  : "border-muted hover:border-primary/50 hover:bg-muted/50 text-muted-foreground"
-                }`}
-            >
-              {isSelected && (
-                <CheckCircle2 className="absolute top-2 right-2 w-4 h-4 text-primary" />
-              )}
-              <span className="text-center">{opt.label}</span>
-              <span className="mt-1 text-xs opacity-70">(Score: {opt.value})</span>
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-
-  return (
-    <div className="w-full max-w-3xl mx-auto pb-12">
-
-      {/* Hide Progress & Headers on Results Step for cleaner UI */}
-      {step !== "results" && (
-        <>
-          {/* Progress bar */}
-          <div className="flex gap-2 mb-8">
-            {steps.filter(s => s !== "results").map((s, i) => (
-              <div key={s} className="flex-1 h-2 rounded-full overflow-hidden bg-secondary">
-                <motion.div
-                  className="h-full bg-primary rounded-full"
-                  initial={{ width: "0%" }}
-                  animate={{ width: i < currentIdx ? "100%" : i === currentIdx ? "50%" : "0%" }}
-                  transition={{ duration: 0.4, ease: "easeOut" }}
-                />
-              </div>
-            ))}
+  // If we have results, completely replace the chat with the ResultsDisplay
+  if (phase === "results" && results) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, scale: 0.98, y: 10 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        className="w-full max-w-3xl mx-auto py-8"
+      >
+        <div className="text-center mb-8">
+          <div className="inline-flex justify-center items-center p-3 rounded-full bg-success/10 text-success mb-4">
+            <CheckCircle2 className="w-8 h-8" />
           </div>
+          <h2 className="text-2xl font-bold font-heading text-foreground">Assessment Complete</h2>
+          <p className="text-muted-foreground mt-2 text-sm">Thank you for sharing. Here is your personalized analysis.</p>
+        </div>
+        <ResultsDisplay data={results} mode={mode} onReset={reset} />
+      </motion.div>
+    );
+  }
 
-          {/* Step header */}
-          <motion.div
-            key={`header-${step}`}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex items-center gap-4 mb-8 p-4 rounded-2xl bg-secondary/30"
-          >
-            <div className="p-3 rounded-xl bg-primary/10">
-              <Icon className="w-6 h-6 text-primary" />
+  // Normal Chat Interface
+  return (
+    <div className="w-full max-w-3xl mx-auto flex flex-col h-[calc(100vh-180px)] min-h-[500px]">
+
+      {/* Chat Messages Area */}
+      <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-6">
+        <AnimatePresence initial={false}>
+          {messages.map((msg, idx) => {
+            const isBot = msg.role === "bot";
+            const isLastMessage = idx === messages.length - 1;
+
+            return (
+              <motion.div
+                key={msg.id}
+                initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                className={`flex gap-3 ${isBot ? "flex-row" : "flex-row-reverse"}`}
+              >
+                {/* Avatar */}
+                <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center mt-1 ${isBot ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
+                  {isBot ? <Bot className="w-4 h-4" /> : <User className="w-4 h-4" />}
+                </div>
+
+                {/* Message Bubble */}
+                <div className={`max-w-[85%] flex flex-col gap-2 ${isBot ? "items-start" : "items-end"}`}>
+                  <div className={`px-4 py-3 rounded-2xl ${isBot ? "bg-secondary/60 text-secondary-foreground rounded-tl-sm" : "bg-primary text-primary-foreground rounded-tr-sm"}`}>
+                    {typeof msg.content === "string" ? (
+                      <span className="leading-relaxed" dangerouslySetInnerHTML={{ __html: msg.content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }} />
+                    ) : (
+                      msg.content
+                    )}
+                  </div>
+
+                  {/* Render Quick Replies */}
+                  {isBot && msg.isQuickReply && isLastMessage && !isTyping && (phase === "gad7" || phase === "phq9") && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2 w-full max-w-[400px]"
+                    >
+                      {RATING_OPTIONS.map((opt) => (
+                        <button
+                          key={opt.value}
+                          onClick={() => handleOptionSelect(opt.value, opt.label)}
+                          className="p-3 text-sm text-center border bg-background hover:border-primary/50 hover:bg-primary/5 rounded-xl transition-all font-medium text-foreground shadow-sm"
+                        >
+                          {opt.label} <span className="opacity-50 text-xs ml-1 font-normal">({opt.value})</span>
+                        </button>
+                      ))}
+                    </motion.div>
+                  )}
+                </div>
+              </motion.div>
+            );
+          })}
+        </AnimatePresence>
+
+        {/* Typing Indicator */}
+        {isTyping && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-3">
+            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center mt-1">
+              <Bot className="w-4 h-4" />
             </div>
-            <div>
-              <h2 className="text-xl font-bold text-foreground">{info.title}</h2>
-              <p className="text-sm text-muted-foreground mt-1">{info.desc}</p>
+            <div className="px-4 py-4 rounded-2xl bg-secondary/60 rounded-tl-sm flex items-center gap-1.5 w-16 justify-center">
+              <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/60 animate-bounce" style={{ animationDelay: '0ms' }}></span>
+              <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/60 animate-bounce" style={{ animationDelay: '150ms' }}></span>
+              <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/60 animate-bounce" style={{ animationDelay: '300ms' }}></span>
             </div>
-            {(step === "gad7" || step === "phq9") && (
-              <div className="ml-auto text-right">
-                <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Current Score</div>
-                <motion.div
-                  className="font-mono text-3xl font-bold text-primary"
-                  key={step === "gad7" ? gadTotal : phqTotal}
-                  initial={{ scale: 1.2, color: "hsl(var(--primary))" }}
-                  animate={{ scale: 1, color: "hsl(var(--primary))" }}
-                >
-                  {step === "gad7" ? gadTotal : phqTotal}
-                  <span className="text-sm text-muted-foreground font-sans ml-1">
-                    /{step === "gad7" ? 21 : 27}
-                  </span>
-                </motion.div>
+          </motion.div>
+        )}
+
+        <div ref={messagesEndRef} className="h-1" />
+      </div>
+
+      {/* Input Area (Only visible during context phase) */}
+      {phase === "context" && mode === "full" && !loading && (
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="p-4 bg-background/80 backdrop-blur-sm border-t">
+          <div className="max-w-3xl mx-auto">
+            {file && (
+              <div className="mb-2 text-xs flex items-center text-primary bg-primary/10 px-3 py-1.5 rounded-md inline-flex">
+                <Paperclip className="w-3 h-3 mr-2" /> {file.name}
+                <button onClick={() => setFile(null)} className="ml-2 font-bold hover:text-destructive">×</button>
               </div>
             )}
-          </motion.div>
-        </>
-      )}
 
-      {/* Main Content Area */}
-      <AnimatePresence mode="wait">
-        {step === "gad7" && (
-          <motion.div
-            key="gad7"
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            transition={{ duration: 0.2 }}
-          >
-            {GAD7_QUESTIONS.map((q, i) => (
-              <QuestionBlock key={`gad-${i}`} question={q} index={i} currentValue={gad7[i]} onChange={(v) => updateGad7(i, v)} />
-            ))}
-          </motion.div>
-        )}
+            <div className="flex items-end gap-2 relative">
+              <textarea
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                placeholder="Share your thoughts, feelings, or attach a file..."
+                className="w-full max-h-32 min-h-[56px] bg-secondary/30 border border-muted-foreground/20 rounded-2xl py-3 px-4 pr-12 resize-none focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all"
+                rows={1}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    handleContextSubmit();
+                  }
+                }}
+              />
+              <input
+                type="file"
+                className="hidden"
+                ref={fileInputRef}
+                onChange={handleFileChange}
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="absolute bottom-3.5 right-[70px] text-muted-foreground hover:text-primary transition-colors"
+                title="Attach file"
+              >
+                <Paperclip className="w-5 h-5" />
+              </button>
 
-        {step === "phq9" && (
-          <motion.div
-            key="phq9"
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            transition={{ duration: 0.2 }}
-          >
-            {PHQ9_QUESTIONS.map((q, i) => (
-              <QuestionBlock key={`phq-${i}`} question={q} index={i} currentValue={phq9[i]} onChange={(v) => updatePhq9(i, v)} />
-            ))}
-          </motion.div>
-        )}
-
-        {step === "text" && (
-          <motion.div
-            key="text"
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            transition={{ duration: 0.2 }}
-            className="p-6 rounded-xl border bg-card shadow-sm"
-          >
-            <h3 className="text-lg font-semibold mb-4">How have you been feeling recently?</h3>
-            <textarea
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              placeholder="Take a moment to write down your thoughts, feelings, or anything that has been bothering you lately. (Minimum a few words required)"
-              className="w-full h-56 rounded-lg border-2 border-muted bg-background p-4 text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary resize-none transition-colors"
-              maxLength={2000}
-            />
-            <div className="flex justify-between items-center mt-3">
-              <span className="text-xs text-muted-foreground">
-                {text.trim().length === 0 ? "Required for analysis" : ""}
-              </span>
-              <span className={`text-xs ${text.length > 1900 ? "text-destructive" : "text-muted-foreground"}`}>
-                {text.length} / 2000 characters
-              </span>
+              <Button
+                onClick={handleContextSubmit}
+                disabled={!text.trim() && !file}
+                className="rounded-2xl h-[56px] w-[56px] flex-shrink-0 shadow-md"
+              >
+                <Send className="w-5 h-5 ml-1" />
+              </Button>
             </div>
-          </motion.div>
-        )}
-
-        {step === "results" && results && (
-          <motion.div
-            key="results"
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            transition={{ duration: 0.4 }}
-          >
-            <ResultsDisplay data={results} mode={mode} onReset={reset} />
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Error Toast/Banner */}
-      <AnimatePresence>
-        {error && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            className="overflow-hidden"
-          >
-            <div className="mt-6 p-4 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm font-medium flex items-center">
-              <Zap className="w-4 h-4 mr-2 flex-shrink-0" />
-              {error}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Navigation Footer */}
-      {step !== "results" && (
-        <div className="flex justify-between items-center mt-8 pt-6 border-t border-border">
-          <Button
-            variant="outline"
-            onClick={prev}
-            disabled={currentIdx === 0}
-            className="gap-2 px-6"
-          >
-            <ArrowLeft className="w-4 h-4" /> Back
-          </Button>
-
-          <Button
-            onClick={next}
-            disabled={!canProceed() || loading}
-            size="lg"
-            className="gap-2 px-8"
-          >
-            {loading ? (
-              <>Processing <Loader2 className="w-4 h-4 animate-spin ml-2" /></>
-            ) : steps[currentIdx + 1] === "results" ? (
-              <>Analyze Results <Zap className="w-4 h-4 ml-1" /></>
-            ) : (
-              <>Continue <ArrowRight className="w-4 h-4 ml-1" /></>
-            )}
-          </Button>
-        </div>
+          </div>
+        </motion.div>
       )}
     </div>
   );

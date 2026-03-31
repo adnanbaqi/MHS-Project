@@ -1,24 +1,24 @@
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import PageTransition from "@/components/PageTransition";
-import { Brain, Shield, Zap, Activity, ArrowRight, FileText, BarChart3 } from "lucide-react";
+import { Brain, Shield, Zap, Activity, MessageCircle, FileText, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const features = [
   {
-    icon: Brain,
-    title: "Clinical Questionnaires",
-    desc: "Standardized GAD-7 and PHQ-9 assessments used by healthcare professionals worldwide.",
+    icon: MessageCircle,
+    title: "Conversational Screening",
+    desc: "A natural, chat-based interface that guides you through standardized GAD-7 and PHQ-9 clinical assessments.",
   },
   {
     icon: FileText,
-    title: "NLP Text Analysis",
-    desc: "AI-powered sentiment analysis identifies risk signals from free-form journal entries.",
+    title: "NLP Journal Analysis",
+    desc: "Share your thoughts freely. Our AI analyzes sentiment and identifies hidden risk signals from your text.",
   },
   {
     icon: BarChart3,
-    title: "Risk Prediction",
-    desc: "Machine learning model combines clinical and text features for accurate risk scoring.",
+    title: "Smart Risk Prediction",
+    desc: "A machine learning model combines your conversational clinical scores and text features for accurate risk scoring.",
   },
 ];
 
@@ -46,7 +46,6 @@ const Home = () => {
 
         {/* Hero */}
         <section className="relative max-w-5xl mx-auto px-6 pt-20 pb-24">
-          {/* Decorative blobs */}
           <div className="absolute -top-20 -right-40 w-[500px] h-[500px] rounded-full bg-primary/5 blur-3xl pointer-events-none" />
           <div className="absolute -bottom-20 -left-40 w-[400px] h-[400px] rounded-full bg-accent/5 blur-3xl pointer-events-none" />
 
@@ -63,23 +62,22 @@ const Home = () => {
                 className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 text-primary text-xs font-medium mb-6"
               >
                 <Shield className="w-3.5 h-3.5" />
-                AI-Powered Clinical Screening
+                Conversational AI Agent
               </motion.div>
 
               <h1 className="text-4xl md:text-5xl font-heading font-extrabold text-foreground tracking-tight leading-[1.1]">
                 Mental Health
                 <br />
-                <span className="text-primary">Risk Assessment</span>
+                <span className="text-primary">Chat Assessment</span>
               </h1>
 
               <p className="mt-5 text-muted-foreground max-w-md leading-relaxed">
-                Combining standardized clinical questionnaires with AI-powered natural language processing
-                for comprehensive, evidence-based mental health screening.
+                Talk to our intelligent assistant. We combine standardized clinical questionnaires with natural language processing for an empathetic, evidence-based mental health screening.
               </p>
 
               <div className="flex gap-3 mt-8">
                 <Button size="lg" onClick={() => navigate("/assess")} className="gap-2 glow-primary">
-                  <Brain className="w-4 h-4" /> Full Assessment
+                  <Brain className="w-4 h-4" /> Start Deep Chat
                 </Button>
                 <Button size="lg" variant="outline" onClick={() => navigate("/assess?mode=quick")} className="gap-2">
                   <Zap className="w-4 h-4" /> Quick Screen
@@ -95,7 +93,6 @@ const Home = () => {
               className="hidden md:flex justify-center"
             >
               <div className="relative w-72 h-72">
-                {/* Animated rings */}
                 {[0, 1, 2].map((i) => (
                   <motion.div
                     key={i}
@@ -111,7 +108,7 @@ const Home = () => {
                     transition={{ duration: 3, repeat: Infinity }}
                     className="p-6 rounded-2xl bg-primary/10 glow-primary"
                   >
-                    <Brain className="w-12 h-12 text-primary" />
+                    <MessageCircle className="w-12 h-12 text-primary" />
                   </motion.div>
                 </div>
               </div>
@@ -129,7 +126,7 @@ const Home = () => {
             className="text-center mb-12"
           >
             <h2 className="text-2xl font-heading font-bold text-foreground">How It Works</h2>
-            <p className="text-sm text-muted-foreground mt-2">Three layers of analysis for accurate risk assessment</p>
+            <p className="text-sm text-muted-foreground mt-2">Three layers of analysis integrated into one seamless conversation</p>
           </motion.div>
 
           <div className="grid md:grid-cols-3 gap-5">
@@ -161,9 +158,9 @@ const Home = () => {
             viewport={{ once: true }}
             className="glass-elevated rounded-2xl p-10 text-center"
           >
-            <h2 className="text-2xl font-heading font-bold text-foreground mb-3">Ready to Begin?</h2>
+            <h2 className="text-2xl font-heading font-bold text-foreground mb-3">Ready to Chat?</h2>
             <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
-              The assessment takes approximately 5 minutes and provides immediate results with clinical recommendations.
+              The conversation takes approximately 3-5 minutes and provides immediate results with clinical recommendations.
             </p>
           </motion.div>
         </section>
@@ -172,7 +169,7 @@ const Home = () => {
         <footer className="border-t border-border py-6">
           <div className="max-w-5xl mx-auto px-6 flex items-center justify-between text-xs text-muted-foreground">
             <p>For clinical screening purposes only — not a diagnostic tool</p>
-            <p>MindScan v1.0.0</p>
+            <p>MindScan v2.0</p>
           </div>
         </footer>
       </div>

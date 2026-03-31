@@ -41,8 +41,8 @@ RECOMMENDATIONS = {
     ),
     "high": (
         "Your responses suggest high risk. Please seek professional help immediately. "
-        "Contact a mental health crisis line:"
-        "Govt HELPLINE KIRAN 1800-599-0019"
+        "Contact a mental health crisis line: "
+        "Govt HELPLINE KIRAN 1800-599-0019. "
         "Talk to a mental health professional as soon as possible. "
         "You are not alone — help is available."
     ),
@@ -114,8 +114,11 @@ def predict_risk(text: str, structured_data: list) -> dict:
         raise HTTPException(status_code=500, detail="Model artifacts not loaded on server.")
 
     # 1. Tokenize Text
+    # If it's a quick screen, text might be empty, so we provide a fallback
+    safe_text = text if text and text.strip() else "No text provided."
+    
     encoding = _tokenizer(
-        text,
+        safe_text,
         add_special_tokens=True,
         max_length=MAX_LEN,
         padding='max_length',
@@ -143,7 +146,7 @@ def predict_risk(text: str, structured_data: list) -> dict:
     # 5. Calculate Final Hybrid Score
     final_risk_score = (prob_lr + prob_rf + prob_svm + lstm_prob) / 4.0
 
-    # 6. CLINICAL OVERRIDE LOGIC
+    # 6. DYNAMIC CLINICAL OVERRIDE LOGIC
     # structured_data[0] is GAD-7 normalized (score / 21.0)
     # structured_data[1] is PHQ-9 normalized (score / 27.0)
     gad_severe = structured_data[0] >= (15.0 / 21.0)  # GAD-7 >= 15 is Severe
@@ -153,8 +156,16 @@ def predict_risk(text: str, structured_data: list) -> dict:
 
     if gad_severe or phq_severe:
         risk_level = "high"
-        # Force the score to be at least 85% so the UI matches the severity
-        final_risk_score = max(final_risk_score, 0.85)
+        
+        # Calculate how high the clinical scores are to scale the override dynamically
+        max_clinical_norm = max(structured_data[0], structured_data[1])
+        
+        # Create a dynamic override score between 0.85 and 0.99 based on severity
+        # This prevents the UI from showing a static 85% every time it triggers
+        dynamic_override_score = min(0.85 + (max_clinical_norm * 0.14), 0.99)
+        
+        # Use the ML score if it's somehow higher, otherwise use our dynamic safety net
+        final_risk_score = max(final_risk_score, dynamic_override_score)
         is_clinical_override = True
     else:
         # Standard Ensemble Logic

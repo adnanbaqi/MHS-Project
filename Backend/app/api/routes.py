@@ -3,7 +3,7 @@ API Routes
 All HTTP endpoints for the Mental Health Risk Assessment System.
 """
 
-import traceback  # <--- NEW IMPORT
+import traceback
 from fastapi import APIRouter, HTTPException
 from app.schemas.request import AssessmentInput, AssessmentOutput, QuickScreenInput
 from app.services.clinical import compute_scores
@@ -34,6 +34,11 @@ def analyze(data: AssessmentInput):
         # Step 4: Predict Risk using the Hybrid Ensemble
         prediction = predict_risk(data.text, structured_features)
 
+        # Step 5: Calculate True System Confidence
+        # In ML, confidence is distance from a 50/50 guess.
+        risk_score = prediction["risk_score"]
+        system_confidence = risk_score if risk_score >= 0.5 else (1.0 - risk_score)
+
         return AssessmentOutput(
             user_id=data.user_id or "anonymous",
             clinical={
@@ -49,9 +54,9 @@ def analyze(data: AssessmentInput):
                 "negative_keywords_found": text_data["negative_keywords_found"],
             },
             prediction={
-                "risk_score": prediction["risk_score"],
+                "risk_score": risk_score,
                 "risk_level": prediction["risk_level"],
-                "confidence": prediction.get("model_breakdown", {}).get("lstm_prob", 0.0) * 100, 
+                "confidence": system_confidence, 
                 "recommendation": prediction["recommendation"],
             },
             timestamp=get_timestamp(),
@@ -122,10 +127,19 @@ def quick_screen(data: QuickScreenInput):
         structured_features = [gad_norm, phq_norm]
 
         prediction = predict_risk("", structured_features)
+        
+        # Calculate true system confidence for the quick screen as well
+        risk_score = prediction["risk_score"]
+        system_confidence = risk_score if risk_score >= 0.5 else (1.0 - risk_score)
 
         return {
             "clinical": clinical_data,
-            "prediction": prediction,
+            "prediction": {
+                "risk_score": risk_score,
+                "risk_level": prediction["risk_level"],
+                "confidence": system_confidence, 
+                "recommendation": prediction["recommendation"],
+            },
             "timestamp": get_timestamp(),
         }
     except Exception as e:
