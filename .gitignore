@@ -4,3 +4,4 @@ saved_models.zip
 Backend/app/models/ml_ensemble.pkl
 Backend/app/models/text_lstm_model.pth
 Frontend/node_modules
+notebooks/1saved_models/
