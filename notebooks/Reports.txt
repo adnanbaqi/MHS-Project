@@ -1,68 +1,148 @@
+PS C:\Users\Adnan Baqi\Downloads\MHS Project> .\venv\Scripts\activate
+(venv) PS C:\Users\Adnan Baqi\Downloads\MHS Project> cd .\notebooks\        
+(venv) PS C:\Users\Adnan Baqi\Downloads\MHS Project\notebooks> py .\train_model.py    
+[*] Initializing Training Pipeline on: NVIDIA GeForce RTX 4060 Laptop GPU
+
+[*] Loading and unifying datasets...
+    -> Parsing Depression Reddit...
+    -> Parsing Dreaddit...
+    -> Parsing Mental Health NLP...
+[*] Successfully unified 3 datasets -> 14,796 rows.
+    Label distribution: {0: 8497, 1: 6299}
+[*] Extracting structured clinical features from text...
+    Structured feature matrix shape: (14796, 12)
+    Feature columns: ['anhedonia', 'depressed_mood', 'sleep_disturb', 'low_energy', 'appetite', 'self_worth', 'concentration', 'psychomotor', 'suicidality', 'anxiety', 'social_isolat', 'stress_load']
+
+[*] Initializing and Training PyTorch BERT-LSTM on CUDA...
+Loading weights: 100%|███████████████████████████████████████████████████████████████████████████████| 199/199 [00:00<00:00, 5007.66it/s]
+BertModel LOAD REPORT from: bert-base-uncased
+Key                                        | Status     |  |
+-------------------------------------------+------------+--+-
+cls.predictions.bias                       | UNEXPECTED |  |
+cls.predictions.transform.dense.weight     | UNEXPECTED |  |
+cls.seq_relationship.bias                  | UNEXPECTED |  |
+cls.seq_relationship.weight                | UNEXPECTED |  |
+cls.predictions.transform.LayerNorm.bias   | UNEXPECTED |  |
+cls.predictions.transform.dense.bias       | UNEXPECTED |  |
+cls.predictions.transform.LayerNorm.weight | UNEXPECTED |  |
+
+Notes:
+- UNEXPECTED:   can be ignored when loading from different task/architecture; not ok if you expect identical arch.
+    Epoch 1/10 | Train: 0.2906 | Val: 0.2103
+                     [+] Best model saved (val_loss=0.2103)
+    Epoch 2/10 | Train: 0.1683 | Val: 0.1896
+                     [+] Best model saved (val_loss=0.1896)
+    Epoch 3/10 | Train: 0.1141 | Val: 0.2012
+    Epoch 4/10 | Train: 0.0780 | Val: 0.2479
+    Epoch 5/10 | Train: 0.0428 | Val: 0.3329
+    [!] Early stopping at epoch 5.
+
+[*] Extracting LSTM probabilities for fusion...
+                                                                                                                                          
+[*] Building TF-IDF features (10,000 unigrams + bigrams)...
+    Fusion matrix shape: (11836, 10013)
+
+[*] Training Scikit-Learn Classifiers (LR, RF, SVM) on CPU...
+
+[*] Tuning decision thresholds for max F1...
+    lstm         -> threshold=0.53  F1=0.9162
+    lr           -> threshold=0.48  F1=0.8751
+    rf           -> threshold=0.45  F1=0.8148
+    svm          -> threshold=0.44  F1=0.8858
+    ensemble     -> threshold=0.48  F1=0.9138
+
 ============================================================
 FULL MODEL COMPARISON REPORT
 ============================================================
 
-[LSTM (DEEP LEARNING)]
-Accuracy : 0.9196 | ROC-AUC : 0.9747
+[LSTM]
+Accuracy : 0.9280 | ROC-AUC : 0.9785
 ----------------------------------------
               precision    recall  f1-score   support
 
-         0.0       0.91      0.95      0.93      1700
-         1.0       0.93      0.88      0.90      1260
+         0.0       0.94      0.93      0.94      1700
+         1.0       0.91      0.92      0.92      1260
 
-    accuracy                           0.92      2960
-   macro avg       0.92      0.91      0.92      2960
-weighted avg       0.92      0.92      0.92      2960
+    accuracy                           0.93      2960
+   macro avg       0.93      0.93      0.93      2960
+weighted avg       0.93      0.93      0.93      2960
 
 
-[LOGISTIC REGRESSION]
-Accuracy : 0.5743 | ROC-AUC : 0.9747
+[LOGISTIC REG]
+Accuracy : 0.8932 | ROC-AUC : 0.9543
 ----------------------------------------
               precision    recall  f1-score   support
 
-         0.0       0.57      1.00      0.73      1700
-         1.0       0.00      0.00      0.00      1260
+         0.0       0.91      0.90      0.91      1700
+         1.0       0.87      0.88      0.88      1260
 
-    accuracy                           0.57      2960
-   macro avg       0.29      0.50      0.36      2960
-weighted avg       0.33      0.57      0.42      2960
+    accuracy                           0.89      2960
+   macro avg       0.89      0.89      0.89      2960
+weighted avg       0.89      0.89      0.89      2960
 
 
 [RANDOM FOREST]
-Accuracy : 0.5311 | ROC-AUC : 0.5038
+Accuracy : 0.8321 | ROC-AUC : 0.9216
 ----------------------------------------
               precision    recall  f1-score   support
 
-         0.0       0.59      0.61      0.60      1700
-         1.0       0.45      0.42      0.43      1260
+         0.0       0.89      0.81      0.85      1700
+         1.0       0.77      0.87      0.81      1260
 
-    accuracy                           0.53      2960
-   macro avg       0.52      0.52      0.52      2960
-weighted avg       0.53      0.53      0.53      2960
+    accuracy                           0.83      2960
+   macro avg       0.83      0.84      0.83      2960
+weighted avg       0.84      0.83      0.83      2960
 
 
-[SUPPORT VECTOR MACH]
-Accuracy : 0.5743 | ROC-AUC : 0.7784
+[SVM]
+Accuracy : 0.9024 | ROC-AUC : 0.9606
 ----------------------------------------
               precision    recall  f1-score   support
 
-         0.0       0.57      1.00      0.73      1700
-         1.0       0.00      0.00      0.00      1260
+         0.0       0.92      0.91      0.91      1700
+         1.0       0.88      0.89      0.89      1260
 
-    accuracy                           0.57      2960
-   macro avg       0.29      0.50      0.36      2960
-weighted avg       0.33      0.57      0.42      2960
+    accuracy                           0.90      2960
+   macro avg       0.90      0.90      0.90      2960
+weighted avg       0.90      0.90      0.90      2960
 
 
-[FINAL HYBRID ENSEMBLE]
-Accuracy : 0.8162 | ROC-AUC : 0.9240
+[HYBRID ENSEMBLE]
+Accuracy : 0.9250 | ROC-AUC : 0.9759
 ----------------------------------------
               precision    recall  f1-score   support
 
-         0.0       0.77      0.96      0.86      1700
-         1.0       0.93      0.62      0.74      1260
+         0.0       0.95      0.92      0.93      1700
+         1.0       0.89      0.93      0.91      1260
 
-    accuracy                           0.82      2960
-   macro avg       0.85      0.79      0.80      2960
-weighted avg       0.84      0.82      0.81      2960
+    accuracy                           0.93      2960
+   macro avg       0.92      0.93      0.92      2960
+weighted avg       0.93      0.93      0.93      2960
 
+
+[*] Generating Visual Dashboards...
+[*] Dashboards saved to: saved_models
+
+[*] Saving model artifacts...
+[*] All artifacts saved. Pipeline complete.
+
+============================================================
+CHATBOT INTEGRATION NOTE
+============================================================
+When connecting your chatbot, replace extract_structured_features()
+with real PHQ-9 / GAD-7 survey answers from the conversation.
+Your 12 feature columns must match in this exact order:
+   1. anhedonia
+   2. depressed_mood
+   3. sleep_disturb
+   4. low_energy
+   5. appetite
+   6. self_worth
+   7. concentration
+   8. psychomotor
+   9. suicidality
+  10. anxiety
+  11. social_isolat
+  12. stress_load
+============================================================
+(venv) PS C:\Users\Adnan Baqi\Downloads\MHS Project\notebooks> 

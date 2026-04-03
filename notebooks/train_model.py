@@ -39,7 +39,8 @@ from transformers import BertTokenizer, BertModel
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.svm import SVC
+from sklearn.svm import LinearSVC
+from sklearn.calibration import CalibratedClassifierCV
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import (
@@ -457,10 +458,14 @@ if __name__ == "__main__":
     # ── Dataloaders ───────────────────────────────────────────────────
     train_ds = MentalHealthDataset(X_train_t, X_train_s, y_train, tokenizer, MAX_LEN)
     val_ds   = MentalHealthDataset(X_test_t,  X_test_s,  y_test,  tokenizer, MAX_LEN)
+    # num_workers=0 is required on Windows — spawned worker processes
+    # re-import the script at module level, causing duplicate prints and
+    # redundant CUDA/dataset initialization. num_workers=0 runs data
+    # loading in the main process, which is safe and still fast on GPU.
     train_loader = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True,
-                               pin_memory=True, num_workers=2)
+                               pin_memory=True, num_workers=0)
     val_loader   = DataLoader(val_ds,   batch_size=BATCH_SIZE, shuffle=False,
-                               pin_memory=True, num_workers=2)
+                               pin_memory=True, num_workers=0)
 
     # ── 1. Train LSTM (BCEWithLogitsLoss + AMP + Early Stopping) ──────
     print("\n[*] Initializing and Training PyTorch BERT-LSTM on CUDA...")
@@ -527,8 +532,10 @@ if __name__ == "__main__":
                                C=1.0, solver="saga", n_jobs=-1)
     rf  = RandomForestClassifier(n_estimators=200, class_weight="balanced",
                                    max_depth=15, random_state=42, n_jobs=-1)
-    svm = SVC(probability=True, class_weight="balanced",
-               kernel="rbf", C=1.0, random_state=42)
+    # LinearSVC trains in seconds on large feature sets (vs hours for RBF SVM).
+    # CalibratedClassifierCV wraps it to provide predict_proba() output.
+    _lsvc = LinearSVC(class_weight="balanced", C=1.0, max_iter=2000, random_state=42)
+    svm   = CalibratedClassifierCV(_lsvc, cv=3)
 
     lr.fit(X_train_fusion,  y_train)
     rf.fit(X_train_fusion,  y_train)
