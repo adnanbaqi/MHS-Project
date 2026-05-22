@@ -14,6 +14,20 @@ const Assess = () => {
   const [searchParams] = useSearchParams();
   const [tab, setTab] = useState<Tab>((searchParams.get("mode") as Tab) || "full");
 
+  // Prevent accidental state wipe when switching tabs
+  const handleTabChange = (newTab: Tab) => {
+    if (newTab === tab) return;
+
+    // Alert the user that they will lose their progress
+    const confirmSwitch = window.confirm(
+      "Switching assessment modes will restart the chat. Are you sure you want to continue?"
+    );
+
+    if (confirmSwitch) {
+      setTab(newTab);
+    }
+  };
+
   return (
     <PageTransition>
       <div className="min-h-screen flex flex-col bg-background">
@@ -41,13 +55,13 @@ const Assess = () => {
             {/* Minimalist Tab Switcher in Header */}
             <div className="hidden sm:flex p-1 bg-secondary rounded-lg">
               <button
-                onClick={() => setTab("full")}
+                onClick={() => handleTabChange("full")}
                 className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-all ${tab === "full" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
               >
                 <Brain className="w-3.5 h-3.5" /> Deep Dive
               </button>
               <button
-                onClick={() => setTab("quick")}
+                onClick={() => handleTabChange("quick")}
                 className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-all ${tab === "quick" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
               >
                 <Zap className="w-3.5 h-3.5" /> Quick
@@ -59,13 +73,13 @@ const Assess = () => {
         {/* Mobile Tab Switcher (Visible only on small screens) */}
         <div className="sm:hidden flex p-2 bg-background border-b justify-center gap-2">
           <button
-            onClick={() => setTab("full")}
+            onClick={() => handleTabChange("full")}
             className={`flex-1 flex justify-center items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border transition-all ${tab === "full" ? "bg-primary/5 border-primary/20 text-primary" : "bg-secondary/50 border-transparent text-muted-foreground"}`}
           >
             <Brain className="w-4 h-4" /> Deep Dive
           </button>
           <button
-            onClick={() => setTab("quick")}
+            onClick={() => handleTabChange("quick")}
             className={`flex-1 flex justify-center items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border transition-all ${tab === "quick" ? "bg-primary/5 border-primary/20 text-primary" : "bg-secondary/50 border-transparent text-muted-foreground"}`}
           >
             <Zap className="w-4 h-4" /> Quick

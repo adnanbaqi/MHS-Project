@@ -63,6 +63,16 @@ const AssessmentForm = ({ apiBaseUrl, mode }: AssessmentFormProps) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Track timeouts to prevent memory leaks and ghost messages
+  const typingTimeouts = useRef<NodeJS.Timeout[]>([]);
+
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      typingTimeouts.current.forEach(clearTimeout);
+    };
+  }, []);
+
   // Auto-scroll to bottom
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -72,16 +82,18 @@ const AssessmentForm = ({ apiBaseUrl, mode }: AssessmentFormProps) => {
     scrollToBottom();
   }, [messages, isTyping, phase]);
 
-  // Helper to simulate bot typing delay
+  // Helper to simulate bot typing delay safely
   const pushBotMessage = (content: string | React.ReactNode, isQuickReply = false, delay = 800) => {
     setIsTyping(true);
-    setTimeout(() => {
+    const timeoutId = setTimeout(() => {
       setMessages((prev) => [
         ...prev,
         { id: Date.now().toString() + Math.random(), role: "bot", content, isQuickReply },
       ]);
       setIsTyping(false);
     }, delay);
+
+    typingTimeouts.current.push(timeoutId);
   };
 
   const pushUserMessage = (content: string | React.ReactNode) => {
@@ -94,13 +106,16 @@ const AssessmentForm = ({ apiBaseUrl, mode }: AssessmentFormProps) => {
   // Initialize chat
   useEffect(() => {
     pushBotMessage("Hi there. I'm here to help assess your well-being. Let's start with a few quick questions about how you've been feeling over the last 2 weeks.", false, 400);
-    setTimeout(() => {
+    const initTimeoutId = setTimeout(() => {
       pushBotMessage(`Over the last 2 weeks, how often have you been bothered by: **${GAD7_QUESTIONS[0]}**`, true, 600);
     }, 1000);
+    typingTimeouts.current.push(initTimeoutId);
   }, []);
 
   const handleOptionSelect = (value: number, label: string) => {
-    // Disable current quick replies immediately to prevent double clicks
+    if (isTyping) return; // Guard against rapid-fire double clicks
+
+    // Disable current quick replies immediately
     setMessages((prev) => prev.map((m, i) => i === prev.length - 1 ? { ...m, isQuickReply: false } : m));
 
     pushUserMessage(label);
@@ -114,9 +129,10 @@ const AssessmentForm = ({ apiBaseUrl, mode }: AssessmentFormProps) => {
       } else {
         setPhase("phq9");
         pushBotMessage("Thank you. Now let's move on to the next set. Over the last 2 weeks, how often have you been bothered by:");
-        setTimeout(() => {
+        const timeoutId = setTimeout(() => {
           pushBotMessage(`**${PHQ9_QUESTIONS[0]}**`, true);
         }, 1200);
+        typingTimeouts.current.push(timeoutId);
       }
     } else if (phase === "phq9") {
       const newPhq9 = [...phq9, value];
@@ -169,7 +185,6 @@ const AssessmentForm = ({ apiBaseUrl, mode }: AssessmentFormProps) => {
 
       const data = await res.json();
       setResults(data);
-      // Wait a moment for UX before snapping to results
       setTimeout(() => setPhase("results"), 1000);
     } catch (e: unknown) {
       let errorMsg = "An unexpected error occurred.";
@@ -193,21 +208,34 @@ const AssessmentForm = ({ apiBaseUrl, mode }: AssessmentFormProps) => {
     }
   };
 
+  const clearFile = () => {
+    setFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = ""; // Fixes ghost file bug
+  };
+
   const reset = () => {
+    // Clear all pending typing timeouts
+    typingTimeouts.current.forEach(clearTimeout);
+    typingTimeouts.current = [];
+    setIsTyping(false);
+
     setGad7([]);
     setPhq9([]);
     setText("");
     setFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+
     setPhase("gad7");
     setResults(null);
     setMessages([]);
+
     pushBotMessage("Let's start over. Over the last 2 weeks, how often have you been bothered by:", false, 400);
-    setTimeout(() => {
+    const timeoutId = setTimeout(() => {
       pushBotMessage(`**${GAD7_QUESTIONS[0]}**`, true, 600);
     }, 1000);
+    typingTimeouts.current.push(timeoutId);
   };
 
-  // If we have results, completely replace the chat with the ResultsDisplay
   if (phase === "results" && results) {
     return (
       <motion.div
@@ -227,11 +255,8 @@ const AssessmentForm = ({ apiBaseUrl, mode }: AssessmentFormProps) => {
     );
   }
 
-  // Normal Chat Interface
   return (
     <div className="w-full max-w-3xl mx-auto flex flex-col h-[calc(100vh-180px)] min-h-[500px]">
-
-      {/* Chat Messages Area */}
       <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-6">
         <AnimatePresence initial={false}>
           {messages.map((msg, idx) => {
@@ -245,12 +270,10 @@ const AssessmentForm = ({ apiBaseUrl, mode }: AssessmentFormProps) => {
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 className={`flex gap-3 ${isBot ? "flex-row" : "flex-row-reverse"}`}
               >
-                {/* Avatar */}
                 <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center mt-1 ${isBot ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
                   {isBot ? <Bot className="w-4 h-4" /> : <User className="w-4 h-4" />}
                 </div>
 
-                {/* Message Bubble */}
                 <div className={`max-w-[85%] flex flex-col gap-2 ${isBot ? "items-start" : "items-end"}`}>
                   <div className={`px-4 py-3 rounded-2xl ${isBot ? "bg-secondary/60 text-secondary-foreground rounded-tl-sm" : "bg-primary text-primary-foreground rounded-tr-sm"}`}>
                     {typeof msg.content === "string" ? (
@@ -260,7 +283,6 @@ const AssessmentForm = ({ apiBaseUrl, mode }: AssessmentFormProps) => {
                     )}
                   </div>
 
-                  {/* Render Quick Replies */}
                   {isBot && msg.isQuickReply && isLastMessage && !isTyping && (phase === "gad7" || phase === "phq9") && (
                     <motion.div
                       initial={{ opacity: 0, y: 10 }}
@@ -271,7 +293,8 @@ const AssessmentForm = ({ apiBaseUrl, mode }: AssessmentFormProps) => {
                         <button
                           key={opt.value}
                           onClick={() => handleOptionSelect(opt.value, opt.label)}
-                          className="p-3 text-sm text-center border bg-background hover:border-primary/50 hover:bg-primary/5 rounded-xl transition-all font-medium text-foreground shadow-sm"
+                          disabled={isTyping}
+                          className="p-3 text-sm text-center border bg-background hover:border-primary/50 hover:bg-primary/5 rounded-xl transition-all font-medium text-foreground shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           {opt.label} <span className="opacity-50 text-xs ml-1 font-normal">({opt.value})</span>
                         </button>
@@ -284,7 +307,6 @@ const AssessmentForm = ({ apiBaseUrl, mode }: AssessmentFormProps) => {
           })}
         </AnimatePresence>
 
-        {/* Typing Indicator */}
         {isTyping && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-3">
             <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center mt-1">
@@ -301,23 +323,26 @@ const AssessmentForm = ({ apiBaseUrl, mode }: AssessmentFormProps) => {
         <div ref={messagesEndRef} className="h-1" />
       </div>
 
-      {/* Input Area (Only visible during context phase) */}
       {phase === "context" && mode === "full" && !loading && (
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="p-4 bg-background/80 backdrop-blur-sm border-t">
           <div className="max-w-3xl mx-auto">
             {file && (
               <div className="mb-2 text-xs flex items-center text-primary bg-primary/10 px-3 py-1.5 rounded-md inline-flex">
                 <Paperclip className="w-3 h-3 mr-2" /> {file.name}
-                <button onClick={() => setFile(null)} className="ml-2 font-bold hover:text-destructive">×</button>
+                <button onClick={clearFile} className="ml-2 font-bold hover:text-destructive">×</button>
               </div>
             )}
 
             <div className="flex items-end gap-2 relative">
               <textarea
                 value={text}
-                onChange={(e) => setText(e.target.value)}
+                onChange={(e) => {
+                  setText(e.target.value);
+                  e.target.style.height = 'auto'; // Reset height to recalculate
+                  e.target.style.height = `${Math.min(e.target.scrollHeight, 128)}px`; // Expand up to 128px (approx max-h-32)
+                }}
                 placeholder="Share your thoughts, feelings, or attach a file..."
-                className="w-full max-h-32 min-h-[56px] bg-secondary/30 border border-muted-foreground/20 rounded-2xl py-3 px-4 pr-12 resize-none focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all"
+                className="w-full max-h-32 min-h-[56px] bg-secondary/30 border border-muted-foreground/20 rounded-2xl py-3 px-4 pr-12 resize-none focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all overflow-y-auto"
                 rows={1}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
